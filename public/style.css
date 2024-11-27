@@ -1,0 +1,94 @@
+h1,
+h2 {
+  color: #0044cc;
+  text-align: center;
+}
+
+.container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.card {
+  margin-bottom: 20px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-body {
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #7c8c97;
+}
+
+.card-text {
+  font-size: 1rem;
+  color: #6c7a89;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, #ff8c8c, #ffafaf);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 1rem;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(90deg, #ffafaf, #ff8c8c);
+}
+
+.btn-danger {
+  background-color: #ff6b81;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 1rem;
+}
+
+.btn-danger:hover {
+  background-color: #ff5c6f;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 400px;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.login-form .form-control {
+  margin-bottom: 15px;
+}
+
+.error-message {
+  color: red;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+  }
+
+  .login-form {
+    width: 100%;
+    max-width: 350px;
+  }
+
+  .btn-primary,
+  .btn-danger {
+    width: 100%;
+  }
+}

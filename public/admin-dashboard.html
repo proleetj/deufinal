@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>관리자 대시보드</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+      .card {
+        margin-bottom: 20px;
+      }
+      .schedule-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-center">관리자 대시보드</h1>
+        <button class="btn btn-danger" onclick="logout()">로그아웃</button>
+      </div>
+
+      <div>
+        <h2>강의 추가</h2>
+        <form
+          id="addCourseForm"
+          onsubmit="event.preventDefault(); addCourse();"
+        >
+          <input type="text" id="courseName" placeholder="강의 이름" required />
+          <input
+            type="text"
+            id="professorName"
+            placeholder="교수 이름"
+            required
+          />
+          <input type="number" id="credits" placeholder="학점" required />
+          <input
+            type="number"
+            id="maxStudents"
+            placeholder="최대 수강 인원"
+            required
+          />
+
+          <div id="scheduleContainer"></div>
+          <button
+            type="button"
+            class="btn btn-secondary mt-2"
+            onclick="addScheduleField()"
+          >
+            + 요일 및 시간 추가
+          </button>
+
+          <button type="submit" class="btn btn-primary mt-3">강의 추가</button>
+        </form>
+      </div>
+
+      <div class="mt-4">
+        <h2>강의 목록</h2>
+        <div id="courseList" class="row"></div>
+      </div>
+
+      <div class="mt-4">
+        <h2>학생 추가</h2>
+        <form onsubmit="event.preventDefault(); addStudent();" class="row g-3">
+          <div class="col-md-4">
+            <input
+              id="studentName"
+              type="text"
+              class="form-control"
+              placeholder="학생 이름"
+              required
+            />
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-primary">학생 추가</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="mt-4">
+        <h2>학생 목록</h2>
+        <div id="studentList" class="row"></div>
+      </div>
+    </div>
+
+    <script>
+      async function fetchCourses() {
+        try {
+          const response = await fetch("http://localhost:3000/courses");
+
+          if (!response.ok) {
+            throw new Error("강의 목록을 가져오는 데 실패했습니다.");
+          }
+
+          const courses = await response.json();
+          const courseList = document.getElementById("courseList");
+          courseList.innerHTML = "";
+
+          courses.forEach((course) => {
+            const scheduleText = course.schedule
+              ? course.schedule
+                  .map((s) => `${s.day} ${s.start}~${s.end}`)
+                  .join(", ")
+              : "시간 정보 없음";
+
+            const item = document.createElement("div");
+            item.className = "card col-md-4";
+            item.innerHTML = `
+              <div class="card-body">
+                <h5 class="card-title">${course.name}</h5>
+                <p class="card-text">${course.professor} - ${course.credits} 학점 (최대 ${course.max_students}명)</p>
+                <p class="card-text">시간: ${scheduleText}</p>
+                <button class="btn btn-danger" onclick="deleteCourse(${course.id})">삭제</button>
+              </div>
+            `;
+            courseList.appendChild(item);
+          });
+        } catch (error) {
+          console.error("강의 목록 로드 중 오류:", error);
+        }
+      }
+
+      async function addCourse() {
+        const name = document.getElementById("courseName").value;
+        const professor = document.getElementById("professorName").value;
+        const credits = parseInt(document.getElementById("credits").value);
+        const maxStudents = parseInt(
+          document.getElementById("maxStudents").value
+        );
+        const schedule = getSchedule();
+
+        if (schedule.length === 0) {
+          alert("요일 및 시간을 최소 한 줄 입력해주세요.");
+          return;
+        }
+
+        try {
+          const response = await fetch("http://localhost:3000/courses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              professor,
+              credits,
+              maxStudents,
+              schedule,
+            }),
+          });
+
+          if (response.ok) {
+            alert("강의가 추가되었습니다!");
+            fetchCourses();
+            resetCourseForm();
+          } else {
+            const message = await response.text();
+            alert(`강의 추가 실패: ${message}`);
+          }
+        } catch (error) {
+          console.error("강의 추가 중 오류:", error);
+        }
+      }
+
+      function addScheduleField() {
+        const scheduleContainer = document.getElementById("scheduleContainer");
+        const scheduleItem = document.createElement("div");
+        scheduleItem.className = "schedule-item";
+
+        scheduleItem.innerHTML = `
+          <select class="day-select">
+            ${["월", "화", "수", "목", "금"]
+              .map((day) => `<option value="${day}">${day}</option>`)
+              .join("")}
+          </select>
+          <select class="time-select">
+            ${[...Array(10)]
+              .map((_, i) => `<option value="${9 + i}:00">${9 + i}:00</option>`)
+              .join("")}
+          </select>
+          ~
+          <select class="time-select">
+            ${[...Array(10)]
+              .map(
+                (_, i) => `<option value="${10 + i}:00">${10 + i}:00</option>`
+              )
+              .join("")}
+          </select>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeScheduleField(this)">삭제</button>
+        `;
+
+        scheduleContainer.appendChild(scheduleItem);
+      }
+
+      function removeScheduleField(button) {
+        button.parentElement.remove();
+      }
+
+      function getSchedule() {
+        const scheduleItems = document.querySelectorAll(
+          "#scheduleContainer .schedule-item"
+        );
+        const schedule = [];
+
+        scheduleItems.forEach((item) => {
+          const day = item.querySelector(".day-select").value;
+          const startTime = item.querySelector(".time-select").value;
+          const endTime = item.querySelectorAll(".time-select")[1].value;
+
+          if (day && startTime && endTime) {
+            schedule.push({ day, start: startTime, end: endTime });
+          }
+        });
+
+        return schedule;
+      }
+
+      async function deleteCourse(courseId) {
+        try {
+          const response = await fetch(
+            `http://localhost:3000/courses/${courseId}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+          if (response.ok) {
+            alert("강의가 삭제되었습니다.");
+            fetchCourses();
+          } else {
+            const message = await response.text();
+            alert(`강의 삭제 실패: ${message}`);
+          }
+        } catch (error) {
+          console.error("강의 삭제 중 오류:", error);
+        }
+      }
+
+      async function addStudent() {
+        const username = document.getElementById("studentName").value.trim();
+
+        if (!username) {
+          alert("학생 이름을 입력해야 합니다.");
+          return;
+        }
+
+        try {
+          const response = await fetch("http://localhost:3000/add-student", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username }),
+          });
+
+          if (response.ok) {
+            alert("학생이 추가되었습니다.");
+            fetchStudents();
+          } else {
+            const message = await response.text();
+            alert(`학생 추가 실패: ${message}`);
+          }
+        } catch (error) {
+          console.error("학생 추가 중 오류:", error);
+        }
+      }
+
+      async function fetchStudents() {
+        try {
+          const response = await fetch("http://localhost:3000/students");
+          const students = await response.json();
+          const studentList = document.getElementById("studentList");
+          studentList.innerHTML = "";
+
+          students.forEach((student) => {
+            const item = document.createElement("div");
+            item.className = "card col-md-3";
+            item.innerHTML = `
+              <div class="card-body">
+                <h5 class="card-title">${student.username}</h5>
+                <p class="card-text">학번: ${student.id}</p>
+                <button class="btn btn-danger" onclick="deleteStudent(${student.id})">삭제</button>
+              </div>
+            `;
+            studentList.appendChild(item);
+          });
+        } catch (error) {
+          console.error("학생 목록 로드 중 오류:", error);
+        }
+      }
+
+      async function deleteStudent(studentId) {
+        try {
+          const response = await fetch(
+            `http://localhost:3000/remove-student/${studentId}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+          if (response.ok) {
+            alert("학생이 삭제되었습니다.");
+            fetchStudents();
+          } else {
+            const message = await response.text();
+            alert(`학생 삭제 실패: ${message}`);
+          }
+        } catch (error) {
+          console.error("학생 삭제 중 오류:", error);
+        }
+      }
+
+      async function logout() {
+        try {
+          const response = await fetch("http://localhost:3000/logout", {
+            method: "POST",
+          });
+
+          if (response.ok) {
+            alert("로그아웃되었습니다.");
+            window.location.href = "/login.html";
+          } else {
+            alert("로그아웃 실패");
+          }
+        } catch (error) {
+          console.error("로그아웃 중 오류:", error);
+        }
+      }
+
+      window.onload = () => {
+        fetchCourses();
+        fetchStudents();
+        addScheduleField();
+      };
+    </script>
+  </body>
+</html>

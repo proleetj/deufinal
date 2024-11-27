@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>학생 대시보드</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 20px;
+      }
+      .main-container {
+        display: flex;
+        gap: 20px;
+      }
+      .left-panel {
+        flex: 1;
+      }
+      .right-panel {
+        flex: 2;
+      }
+      .card {
+        margin-bottom: 20px;
+      }
+      .timetable {
+        display: grid;
+        grid-template-columns: 100px repeat(5, 1fr);
+        grid-template-rows: 50px repeat(10, 1fr);
+        gap: 1px;
+        background-color: #ddd;
+      }
+      .timetable > div {
+        background-color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #ccc;
+        font-size: 14px;
+        text-align: center;
+      }
+      .header {
+        background-color: #f4f4f4;
+        font-weight: bold;
+      }
+      .occupied {
+        background-color: rgba(135, 206, 250, 0.7);
+        color: #333;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .hover-temp {
+        background-color: rgba(255, 182, 193, 0.7);
+        font-weight: bold;
+        color: #000;
+      }
+      .course-table td {
+        padding: 10px;
+        text-align: center;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="text-center">학생 대시보드</h1>
+      <div class="text-end mb-4">
+        <button class="btn btn-danger" onclick="logout()">로그아웃</button>
+      </div>
+
+      <div class="main-container">
+        <div class="left-panel">
+          <h2>신청 가능한 강의</h2>
+          <div id="availableCourses" class="row"></div>
+        </div>
+
+        <div class="right-panel">
+          <h2>신청한 강의</h2>
+          <table class="table course-table">
+            <thead>
+              <tr>
+                <th>강의명</th>
+                <th>교수</th>
+                <th>학점</th>
+                <th>취소</th>
+              </tr>
+            </thead>
+            <tbody id="enrolledTable"></tbody>
+          </table>
+
+          <h2>시간표</h2>
+          <div class="timetable" id="timetable"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const colors = ["#f8b400", "#00b4d8", "#ff6b6b", "#a29bfe", "#fd79a8"];
+
+      async function fetchDashboard() {
+        const sessionResponse = await fetch(
+          `http://localhost:3000/check-session`
+        );
+        if (!sessionResponse.ok) {
+          alert("로그인이 필요합니다.");
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const userId = (await sessionResponse.json()).id;
+
+        const availableResponse = await fetch(
+          `http://localhost:3000/available-courses/${userId}`
+        );
+        const enrolledResponse = await fetch(
+          `http://localhost:3000/my-courses`
+        );
+
+        const availableCourses = await availableResponse.json();
+        const enrolledCourses = await enrolledResponse.json();
+
+        renderAvailableCourses(availableCourses);
+        renderEnrolledCourses(enrolledCourses);
+        renderTimetable(enrolledCourses);
+      }
+
+      function formatSchedule(schedule) {
+        if (!schedule || schedule.length === 0) return "시간 정보 없음";
+        return schedule.map((s) => `${s.day} ${s.start}~${s.end}`).join(", ");
+      }
+
+      function renderAvailableCourses(courses) {
+        const availableList = document.getElementById("availableCourses");
+        availableList.innerHTML = "";
+
+        courses.forEach((course, index) => {
+          const color = colors[index % colors.length];
+          const item = document.createElement("div");
+          item.className = "card";
+          item.style.borderLeft = `5px solid ${color}`;
+          item.innerHTML = `
+            <div class="card-body">
+              <h5 class="card-title">${course.name}</h5>
+              <p class="card-text">${course.professor} - ${
+            course.credits
+          } 학점</p>
+              <p class="card-text">시간: ${formatSchedule(course.schedule)}</p>
+              <button class="btn btn-primary" onclick="enrollCourse(${
+                course.id
+              })">
+                수강 신청
+              </button>
+            </div>
+          `;
+          item.onmouseover = () => addHoverEffect(course);
+          item.onmouseout = () => removeHoverEffect(course);
+          availableList.appendChild(item);
+        });
+      }
+
+      function renderEnrolledCourses(courses) {
+        const enrolledTable = document.getElementById("enrolledTable");
+        enrolledTable.innerHTML = "";
+
+        courses.forEach((course, index) => {
+          const row = document.createElement("tr");
+          const color = colors[index % colors.length];
+          row.style.backgroundColor = color;
+
+          row.innerHTML = `
+            <td>${course.name}</td>
+            <td>${course.professor}</td>
+            <td>${course.credits}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="cancelEnrollment(${course.id})">취소</button></td>
+          `;
+          enrolledTable.appendChild(row);
+        });
+      }
+
+      function renderTimetable(courses) {
+        const timetable = document.getElementById("timetable");
+        createTimetable();
+
+        courses.forEach((course, index) => {
+          const color = colors[index % colors.length];
+          course.schedule.forEach((time) => {
+            const dayIndex = ["월", "화", "수", "목", "금"].indexOf(time.day);
+            const startIndex = parseInt(time.start.split(":")[0]) - 9;
+            const endIndex = parseInt(time.end.split(":")[0]) - 9;
+
+            for (let i = startIndex; i < endIndex; i++) {
+              const cell = timetable.children[(i + 1) * 6 + (dayIndex + 1)];
+              cell.classList.add("occupied");
+              cell.style.backgroundColor = color;
+              cell.textContent = course.name;
+            }
+          });
+        });
+      }
+
+      function createTimetable() {
+        const timetable = document.getElementById("timetable");
+        const days = ["월", "화", "수", "목", "금"];
+        const hours = Array.from({ length: 10 }, (_, i) => `${9 + i}:00`);
+
+        timetable.innerHTML = '<div class="header"></div>';
+        days.forEach((day) => {
+          timetable.innerHTML += `<div class="header">${day}</div>`;
+        });
+
+        hours.forEach((hour) => {
+          timetable.innerHTML += `<div class="header">${hour}</div>`;
+          days.forEach(() => {
+            timetable.innerHTML += `<div></div>`;
+          });
+        });
+      }
+
+      function addHoverEffect(course) {
+        const timetable = document.getElementById("timetable");
+
+        course.schedule.forEach((time) => {
+          const dayIndex = ["월", "화", "수", "목", "금"].indexOf(time.day);
+          const startIndex = parseInt(time.start.split(":")[0]) - 9;
+          const endIndex = parseInt(time.end.split(":")[0]) - 9;
+
+          for (let i = startIndex; i < endIndex; i++) {
+            const cell = timetable.children[(i + 1) * 6 + (dayIndex + 1)];
+            cell.classList.add("hover-temp");
+          }
+        });
+      }
+
+      function removeHoverEffect(course) {
+        const timetable = document.getElementById("timetable");
+
+        course.schedule.forEach((time) => {
+          const dayIndex = ["월", "화", "수", "목", "금"].indexOf(time.day);
+          const startIndex = parseInt(time.start.split(":")[0]) - 9;
+          const endIndex = parseInt(time.end.split(":")[0]) - 9;
+
+          for (let i = startIndex; i < endIndex; i++) {
+            const cell = timetable.children[(i + 1) * 6 + (dayIndex + 1)];
+            cell.classList.remove("hover-temp");
+          }
+        });
+      }
+
+      async function enrollCourse(courseId) {
+        const response = await fetch(`http://localhost:3000/enroll`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ courseId }),
+        });
+        if (response.ok) {
+          alert("수강 신청이 완료되었습니다!");
+          location.reload();
+        } else {
+          alert("수강 신청 실패");
+        }
+      }
+
+      async function cancelEnrollment(courseId) {
+        const response = await fetch(`http://localhost:3000/enroll`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ courseId }),
+        });
+        if (response.ok) {
+          alert("수강 신청이 취소되었습니다!");
+          location.reload();
+        } else {
+          alert("수강 취소 실패");
+        }
+      }
+
+      async function logout() {
+        const response = await fetch(`http://localhost:3000/logout`, {
+          method: "POST",
+        });
+        if (response.ok) {
+          alert("로그아웃되었습니다.");
+          window.location.href = "/login.html";
+        } else {
+          alert("로그아웃 실패");
+        }
+      }
+
+      window.onload = fetchDashboard;
+    </script>
+  </body>
+</html>
